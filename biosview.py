@@ -37,6 +37,7 @@ what this is and which image it is showing.
 """
 from __future__ import unicode_literals
 
+import datetime
 import tkinter as tk
 
 import engine
@@ -68,6 +69,9 @@ ATTR_KEYS = (LIGHTGRAY, BLUE)
 ATTR_GREYED = (DARKGRAY, BLUE)
 ATTR_HIDDEN = (LIGHTRED, BLUE)          # what the firmware would not show
 ATTR_HIDDEN_SEL = (BLACK, LIGHTRED)
+ATTR_EDIT = (WHITE, BLACK)          # the part of a date or time being typed
+ATTR_POPUP = (BLACK, LIGHTGRAY)     # the option list the setup pops up
+ATTR_POPUP_SEL = (WHITE, BLUE)
 
 COLUMNS = 100                 # the text mode the setup runs in
 ROWS = 31
@@ -96,6 +100,12 @@ class BiosView(tk.Frame):
         self.rows = []
         self.show_hidden = False
         self.image_name = ""
+        # The board keeps date and time in the RTC, not in a variable: those
+        # two entries have no varstore at all (offset 0xFFFF). To behave like
+        # the setup we keep a clock of our own, started from this machine.
+        self.clock = datetime.datetime.now().replace(microsecond=0)
+        self.field = 0                  # which part of a date or time is being edited
+        self.popup = None               # the option list or the number box
         self._glyph_cache = {}
         self._cells = {}                # (row, column) -> (char, fg, bg)
 
@@ -106,10 +116,11 @@ class BiosView(tk.Frame):
                                 bd=0, takefocus=True, cursor="arrow")
         self.screen.pack(expand=True)
 
-        for key in ("<Up>", "<Down>", "<Left>", "<Right>", "<Return>",
-                    "<Escape>", "<plus>", "<minus>", "<KP_Add>", "<KP_Subtract>",
-                    "<Prior>", "<Next>", "<Home>", "<End>", "<F9>"):
-            self.screen.bind(key, self._key)
+        # One handler for everything, the way a console has one keyboard: the
+        # setup answers to arrows, Enter, Esc, Tab, plus and minus AND to typed
+        # digits, and splitting that across a dozen bindings is how a key ends
+        # up doing nothing without anyone noticing.
+        self.screen.bind("<Key>", self._key)
         self.screen.bind("<Button-1>", self._click)
         self.screen.bind("<Double-Button-1>", self._enter)
 
@@ -260,6 +271,9 @@ class BiosView(tk.Frame):
         self._write(ROWS - 2, 1, where[:COLUMNS - 2], ATTR_KEYS)
         self._write(ROWS - 1, 1, self._counts(entries)[:COLUMNS - 2], ATTR_KEYS)
 
+        if self.popup is not None:
+            self._draw_popup()
+
         self._paint()
         if self.on_select:
             self.on_select(self.selected_question())
@@ -288,20 +302,58 @@ class BiosView(tk.Frame):
             name = "  " + name
         self._write(row, 2, name[:HELP_AT - 22], attribute)
 
-        if not is_link:
-            raw = self.state.read(question)
-            if raw is not engine.UNKNOWN:
-                shown = None
-                for option in question.options:
-                    if option.value == raw:
-                        shown = option.text
-                if not shown:
-                    shown = "0x%X" % raw
-                text = "[%s]" % shown[:16]
-                value_attribute = attribute if selected else (
-                    ATTR_VALUE if not result.hidden and not result.greyed
-                    else attribute)
-                self._write(row, HELP_AT - len(text) - 2, text, value_attribute)
+        shown = self.value_text(question)
+        if shown is not None:
+            text = "[%s]" % shown[:22]
+            value_attribute = attribute if selected else (
+                ATTR_VALUE if not result.hidden and not result.greyed
+                else attribute)
+            column = HELP_AT - len(text) - 2
+            self._write(row, column, text, value_attribute)
+            # While a date or a time is being edited, the part under the cursor
+            # is shown in reverse, the way the setup marks it.
+            if selected and question.kind in ("Date", "Time"):
+                start, length = self._field_span(question, shown)
+                self._write(row, column + 1 + start, shown[start:start + length],
+                            ATTR_EDIT)
+
+    # ----------------------------------------------------------- the values
+
+    def value_text(self, question):
+        """What the setup would print between the brackets, or None."""
+        kind = question.kind
+        if kind in ("Ref", "Action", "ResetButton", "Subtitle", "Text"):
+            return None
+        if kind == "Date":
+            return self.clock.strftime("%a %m/%d/%Y")
+        if kind == "Time":
+            return self.clock.strftime("%H:%M:%S")
+        raw = self.state.read(question)
+        if raw is engine.UNKNOWN:
+            return None
+        if kind == "CheckBox":
+            return "X" if raw else " "
+        for option in question.options:
+            if option.value == raw:
+                if option.text:
+                    return option.text
+                break
+        if kind == "Numeric":
+            # The setup prints numbers in decimal; the mask entries of AMD CBS
+            # are the exception, and they say so in their own name.
+            name = question.text_label.lower()
+            if "mask" in name or "address" in name or "value" in name:
+                return "0x%X" % raw
+            return str(raw)
+        return "0x%X" % raw
+
+    def _field_span(self, question, shown):
+        """Which slice of a date or time the cursor is on: (start, length)."""
+        if question.kind == "Date":                 # "Sat 08/30/2026"
+            spans = [(4, 2), (7, 2), (10, 4)]       # month, day, year
+        else:                                       # "19:28:45"
+            spans = [(0, 2), (3, 2), (6, 2)]        # hours, minutes, seconds
+        return spans[min(self.field, len(spans) - 1)]
 
     def _counts(self, entries):
         hidden = sum(1 for _q, result in entries if result.hidden)
@@ -400,6 +452,114 @@ class BiosView(tk.Frame):
                                                        background),
                                      anchor="nw")
 
+    # --------------------------------------------------------------- popup
+
+    def _draw_popup(self):
+        """The little window the setup opens on top of the menu."""
+        popup = self.popup
+        question = popup["question"]
+        if popup["kind"] == "options":
+            body = [option.text or ("0x%X" % option.value)
+                    for option in question.options]
+            chosen = popup["index"]
+        else:
+            limits = ""
+            minimum = question.node.fields.get("minimum")
+            maximum = question.node.fields.get("maximum")
+            if minimum is not None:
+                limits = "Range: %s - %s" % (minimum, maximum)
+            body = [popup["buffer"] + "_", "", limits]
+            chosen = -1
+
+        title = question.text_label.strip()
+        width = max([len(title)] + [len(line) for line in body]) + 6
+        width = min(max(width, 24), COLUMNS - 8)
+        height = len(body) + 4
+        top = max(3, (ROWS - height) // 2)
+        left = max(2, (COLUMNS - width) // 2)
+
+        self._write(top, left, "╔" + "═" * (width - 2) + "╗", ATTR_POPUP)
+        self._write(top + 1, left, "║" + title.center(width - 2) + "║", ATTR_POPUP)
+        self._write(top + 2, left, "╠" + "═" * (width - 2) + "╣", ATTR_POPUP)
+        for offset, line in enumerate(body):
+            row = top + 3 + offset
+            attribute = ATTR_POPUP_SEL if offset == chosen else ATTR_POPUP
+            self._write(row, left, "║", ATTR_POPUP)
+            self._write(row, left + 1, (" " + line).ljust(width - 2), attribute)
+            self._write(row, left + width - 1, "║", ATTR_POPUP)
+        self._write(top + height - 1, left, "╚" + "═" * (width - 2) + "╝",
+                    ATTR_POPUP)
+
+    def _open_editor(self):
+        """Enter on an entry: what the setup does depends on the kind."""
+        question = self.selected_question()
+        if question is None:
+            return
+        kind = question.kind
+        if kind == "CheckBox":
+            self._change_value(1)
+            return
+        if question.options:
+            current = self.state.read(question)
+            index = 0
+            for position, option in enumerate(question.options):
+                if option.value == current:
+                    index = position
+            self.popup = {"kind": "options", "question": question, "index": index}
+            return
+        if kind == "Numeric":
+            self.popup = {"kind": "number", "question": question, "buffer": ""}
+            return
+        # Date and time are edited in place, like the setup: Tab moves between
+        # the parts, plus and minus or the digits change them.
+
+    def _popup_key(self, event):
+        popup = self.popup
+        key = event.keysym
+        question = popup["question"]
+        if key == "Escape":
+            self.popup = None
+        elif popup["kind"] == "options":
+            if key == "Up":
+                popup["index"] = max(0, popup["index"] - 1)
+            elif key == "Down":
+                popup["index"] = min(len(question.options) - 1, popup["index"] + 1)
+            elif key == "Return":
+                try:
+                    self.state.set_value(question,
+                                         question.options[popup["index"]].value)
+                except ValueError:
+                    pass
+                self.popup = None
+        else:
+            if key == "BackSpace":
+                popup["buffer"] = popup["buffer"][:-1]
+            elif key == "Return":
+                self._apply_typed_number(question, popup["buffer"])
+                self.popup = None
+            elif event.char and event.char.isdigit():
+                popup["buffer"] = (popup["buffer"] + event.char)[:10]
+        self.draw()
+        return "break"
+
+    def _apply_typed_number(self, question, text):
+        if not text:
+            return
+        try:
+            value = int(text, 0)
+        except ValueError:
+            return
+        minimum = question.node.fields.get("minimum")
+        maximum = question.node.fields.get("maximum")
+        if minimum is not None and value < minimum:
+            value = minimum
+        if maximum is not None and value > maximum:
+            value = maximum
+        try:
+            self.state.set_value(question, value)
+        except ValueError:
+            pass
+
     # -------------------------------------------------------------- export
 
     def export_png(self, path, zoom=2):
@@ -457,11 +617,16 @@ class BiosView(tk.Frame):
     # ------------------------------------------------------------ navigation
 
     def _key(self, event):
+        if self.popup is not None:
+            return self._popup_key(event)
         key = event.keysym
+        question = self.selected_question()
         if key == "Up":
             self.row_index = max(0, self.row_index - 1)
+            self.field = 0
         elif key == "Down":
             self.row_index = min(len(self.rows) - 1, self.row_index + 1)
+            self.field = 0
         elif key == "Prior":
             self.row_index = max(0, self.row_index - 10)
         elif key == "Next":
@@ -471,30 +636,92 @@ class BiosView(tk.Frame):
         elif key == "End":
             self.row_index = max(0, len(self.rows) - 1)
         elif key in ("Left", "Right"):
-            # The tab bar only moves at the top level, exactly as on the board:
-            # inside a submenu these keys do nothing.
-            if len(self.stack) == 1 and self.tabs:
+            # Inside a date or a time these move between its parts; at the top
+            # of a tab they change tab. Same keys, same places as the setup.
+            if question is not None and question.kind in ("Date", "Time"):
+                self.field = (self.field + (1 if key == "Right" else -1)) % 3
+            elif len(self.stack) == 1 and self.tabs:
                 step = -1 if key == "Left" else 1
                 self.tab_index = (self.tab_index + step) % len(self.tabs)
                 self.stack = [self.tabs[self.tab_index]]
                 self.row_index = 0
+        elif key == "Tab":
+            self.field = (self.field + 1) % 3
         elif key == "Return":
             return self._enter()
         elif key == "Escape":
             if len(self.stack) > 1:
                 self.stack.pop()
                 self.row_index = 0
-        elif key in ("plus", "KP_Add", "minus", "KP_Subtract"):
-            self._change_value(1 if key in ("plus", "KP_Add") else -1)
+        elif key in ("plus", "KP_Add", "equal"):
+            self._change_value(1)
+        elif key in ("minus", "KP_Subtract"):
+            self._change_value(-1)
         elif key == "F9":
             if self.state is not None:
                 self.state.apply_defaults()
+        elif event.char and event.char.isdigit():
+            self._typed_digit(question, event.char)
+        else:
+            return None
         self.draw()
         return "break"
 
+    def _typed_digit(self, question, digit):
+        """Typing a digit: on a number it opens the box, on a clock it edits.
+
+        This is what the setup does, and it is the difference between a screen
+        you look at and one you use: nobody walks a BIOS pressing plus forty
+        times to get a temperature from 20 to 60.
+        """
+        if question is None:
+            return
+        if question.kind == "Numeric":
+            self.popup = {"kind": "number", "question": question, "buffer": digit}
+        elif question.kind in ("Date", "Time"):
+            self._type_into_clock(question, digit)
+
+    def _type_into_clock(self, question, digit):
+        """Digits typed into the date or the time, one part at a time."""
+        buffer_key = (question.kind, self.field)
+        if getattr(self, "_clock_key", None) != buffer_key:
+            self._clock_key, self._clock_buffer = buffer_key, ""
+        self._clock_buffer = (self._clock_buffer + digit)[-4:]
+        try:
+            number = int(self._clock_buffer)
+        except ValueError:
+            return
+        clock = self.clock
+        try:
+            if question.kind == "Date":
+                if self.field == 0:
+                    clock = clock.replace(month=max(1, min(12, number)))
+                elif self.field == 1:
+                    clock = clock.replace(day=max(1, min(28, number)))
+                elif len(self._clock_buffer) == 4:
+                    clock = clock.replace(year=max(1998, min(9999, number)))
+            else:
+                if self.field == 0:
+                    clock = clock.replace(hour=min(23, number))
+                elif self.field == 1:
+                    clock = clock.replace(minute=min(59, number))
+                else:
+                    clock = clock.replace(second=min(59, number))
+        except ValueError:
+            return
+        self.clock = clock
+
     def _enter(self, _event=None):
         question = self.selected_question()
-        if question is None or question.kind != "Ref":
+        if question is None:
+            self.draw()
+            return "break"
+        if question.kind != "Ref":
+            # Enter on anything that is not a link opens its editor: the option
+            # list, the number box, or the checkbox flipping over. On the board
+            # that is what Enter does, and a menu where Enter does nothing is
+            # a picture of a menu.
+            self._open_editor()
             self.draw()
             return "break"
         wanted = question.node.fields.get("form")
@@ -520,21 +747,71 @@ class BiosView(tk.Frame):
         return "break"
 
     def _change_value(self, direction):
-        """Plus and minus walk the options, as they do in the firmware."""
+        """Plus and minus, on every kind of entry the setup lets you change."""
         question = self.selected_question()
-        if question is None or not question.options:
+        if question is None:
             return
-        current = self.state.read(question)
-        values = [option.value for option in question.options]
+        kind = question.kind
+
+        if kind in ("Date", "Time"):
+            self._step_clock(question, direction)
+            return
+
+        if question.options:                       # OneOf, and CheckBox with options
+            current = self.state.read(question)
+            values = [option.value for option in question.options]
+            try:
+                position = values.index(current)
+            except ValueError:
+                position = 0
+            position = (position + direction) % len(values)
+            self._set(question, values[position])
+            return
+
+        if kind == "CheckBox":
+            current = self.state.read(question)
+            self._set(question, 0 if current else 1)
+            return
+
+        if kind == "Numeric":
+            current = self.state.read(question)
+            if current is engine.UNKNOWN:
+                current = question.node.fields.get("minimum") or 0
+            step = question.node.fields.get("step") or 1
+            minimum = question.node.fields.get("minimum")
+            maximum = question.node.fields.get("maximum")
+            value = current + step * direction
+            # The setup wraps around at the ends instead of stopping dead.
+            if minimum is not None and value < minimum:
+                value = maximum if maximum is not None else minimum
+            elif maximum is not None and value > maximum:
+                value = minimum if minimum is not None else maximum
+            self._set(question, value)
+
+    def _set(self, question, value):
         try:
-            position = values.index(current)
-        except ValueError:
-            position = 0
-        position = (position + direction) % len(values)
-        try:
-            self.state.set_value(question, values[position])
+            self.state.set_value(question, value)
         except ValueError:
             pass
+
+    def _step_clock(self, question, direction):
+        """Plus and minus on the part of the date or time under the cursor."""
+        clock = self.clock
+        try:
+            if question.kind == "Date":
+                if self.field == 0:
+                    month = (clock.month - 1 + direction) % 12 + 1
+                    clock = clock.replace(month=month)
+                elif self.field == 1:
+                    clock = clock + datetime.timedelta(days=direction)
+                else:
+                    clock = clock.replace(year=max(1998, clock.year + direction))
+            else:
+                seconds = {0: 3600, 1: 60, 2: 1}[min(self.field, 2)]
+                clock = clock + datetime.timedelta(seconds=seconds * direction)
+        except ValueError:
+            return
+        self.clock = clock
 
     def _click(self, event):
         self.screen.focus_set()

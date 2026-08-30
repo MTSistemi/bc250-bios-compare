@@ -93,6 +93,15 @@ The picture above was not screen-captured: `BiosView.export_png()` builds it
 from the same glyphs and the same palette the window draws with, so it is exact
 and repeatable.
 
+Every kind of entry is editable, the way the setup edits it: Enter on a choice
+opens the option list, Enter on a number opens a box you type into, digits go
+straight in, plus and minus step through values, and a checkbox flips. Date and
+time are edited in place - left and right, or Tab, move between month, day and
+year, and the part under the cursor is shown in reverse. The board keeps those
+two in the RTC and not in a variable, so this screen keeps a clock of its own.
+
+![The option list, as the setup opens it](screenshots/bios-popup.png)
+
 Two things happen here that cannot happen on a real board:
 
 - the hidden entries can be **revealed in place**, marked rather than missing,
