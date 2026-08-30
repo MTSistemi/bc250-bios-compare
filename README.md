@@ -68,6 +68,28 @@ the `UMCCONFIG` masks, the clock gating switches - which together cover
 **48% of the 1507 entries** of a stock image, in all nine languages. A family
 card is written once and corrected in one place.
 
+### Walking the menu the way the board shows it
+
+The **BIOS view** tab draws the same menu the board would: tab bar across the
+top, entries with their value in brackets, help panel on the right, key legend
+at the bottom. It is driven by the same keys - arrows to move, Enter to walk
+into a submenu, Esc to come back, `+`/`-` to change a value, F9 for defaults.
+
+Two things happen here that cannot happen on a real board:
+
+- the hidden entries can be **revealed in place**, marked rather than missing,
+  so you see where in the menu the 651 of them actually live;
+- changing a value re-evaluates every condition at once, so entries appear and
+  disappear under your hands, with no reboot in between.
+
+Cross links are followed too: pressing Enter on `Chipset > GFX Configuration`
+lands inside the AMD CBS form set, exactly as it does on the board.
+
+The vendor's title and copyright lines are deliberately **not** reproduced. The
+layout is the point; printing somebody else's banner at the top of our own
+window would be claiming to be their firmware. The footer shows the firmware
+version read from the image instead.
+
 ### The rest of it
 
 - The **state** column says whether an entry is shown, **hidden**, shown but

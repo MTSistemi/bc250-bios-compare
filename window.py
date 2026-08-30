@@ -34,6 +34,7 @@ from tkinter import filedialog
 from tkinter import messagebox
 from tkinter import ttk
 
+import biosview
 import engine
 import explain
 import hii
@@ -134,6 +135,16 @@ class Application(tk.Tk):
                         arrowcolor=theme.MUT, gripcount=0, relief="flat")
         style.map("Tree.Vertical.TScrollbar",
                   background=[("active", theme.ACTIVE)])
+        # The notebook tabs: stock clam draws them light grey, which on the
+        # slate background looks like a different program.
+        style.configure("TNotebook", background=theme.INK, borderwidth=0,
+                        tabmargins=(0, 0, 0, 0))
+        style.configure("TNotebook.Tab", background=theme.PANEL,
+                        foreground=theme.MUT, font=self.theme.f_micro,
+                        padding=(14, 6), borderwidth=0)
+        style.map("TNotebook.Tab",
+                  background=[("selected", theme.PANEL2)],
+                  foreground=[("selected", theme.FG)])
 
     def _build_ui(self):
         """Draw the whole window. Called again to change language.
@@ -247,9 +258,22 @@ class Application(tk.Tk):
                                showhandle=False)
         split.pack(fill="both", expand=True, padx=14, pady=(0, 8))
 
-        # --- left: the tree of forms and subforms --------------------------
-        left, left_body = theme.card(split, T("menu entries"), self.theme)
-        split.add(left, minsize=520, stretch="always")
+        # --- left: two ways of looking at the same menu --------------------
+        # The tree answers "what is in this image", the BIOS view answers
+        # "what would I see sitting in front of the board". They share the
+        # state, so a value changed in one shows up in the other.
+        self.views = ttk.Notebook(split)
+        split.add(self.views, minsize=520, stretch="always")
+
+        tree_page = tk.Frame(self.views, background=theme.INK)
+        self.views.add(tree_page, text="  %s  " % T("Menu tree"))
+        left, left_body = theme.card(tree_page, T("menu entries"), self.theme)
+        left.pack(fill="both", expand=True)
+
+        self.bios = biosview.BiosView(self.views, on_select=self._bios_selected,
+                                      on_formset_change=self._bios_crossed)
+        self.views.add(self.bios, text="  %s  " % T("BIOS view"))
+        self.views.bind("<<NotebookTabChanged>>", lambda _e: self._view_changed())
 
         columns = ("offset", "value", "state")
         self.tree = ttk.Treeview(left_body, columns=columns,
@@ -545,6 +569,67 @@ class Application(tk.Tk):
 
         self._update_footer()
         self.show_details()
+        self._refresh_bios_view()
+
+    def _refresh_bios_view(self):
+        """Keep the BIOS view on the same form set and the same values."""
+        view = getattr(self, "bios", None)
+        if view is None or self.formset is None:
+            return
+        view.set_show_hidden(bool(self.show_hidden.get()))
+        if view.formset is not self.formset:
+            view.load(self.formset, self.state, self._firmware_version(),
+                      formsets=self.formsets)
+        else:
+            view.set_state(self.state)
+
+    def _firmware_version(self):
+        """The version string the image carries, for the bottom of the screen.
+
+        It is read from the menu itself - the BIOS shows it on its Main page -
+        so it is true for the image being looked at, not a guess.
+        """
+        for formset in self.formsets:
+            for question in formset.questions:
+                label = question.text_label.strip().lower()
+                if label in ("bios version", "project version", "bios revision"):
+                    return question.help_text.strip() or label
+        return ""
+
+    def _bios_selected(self, question):
+        """The BIOS view moved: the details panel follows it."""
+        if question is None:
+            return
+        self.selected = question
+        if self.views.index(self.views.select()) == 1:
+            self._show_details_for(question)
+            self._tell_effect()
+
+    def _bios_crossed(self, formset, form):
+        """A Ref led into another form set: follow it, state and all."""
+        if formset not in self.formsets:
+            return
+        self.formset_index = self.formsets.index(formset)
+        self.formset_choice.current(self.formset_index)
+        self.formset = formset
+        self._prepare_state()
+        self.fill_tree()
+        self.bios.load(formset, self.state, self._firmware_version(),
+                       formsets=self.formsets)
+        self.bios.go_to(formset, form, self.state)
+        self._update_footer()
+
+    def _view_changed(self):
+        """Switching view keeps the selection and gives the keyboard focus."""
+        if self.formset is None:
+            return
+        if self.views.index(self.views.select()) == 1:
+            self._refresh_bios_view()
+            self.bios.screen.focus_set()
+        else:
+            self.fill_tree()
+            if self.selected is not None:
+                self._reselect(self.selected)
 
     def _update_footer(self):
         if self.formset is None:
@@ -581,6 +666,10 @@ class Application(tk.Tk):
             self._clear_panel(T("Choose an entry in the tree."))
             self.selected = None
             return
+        self._show_details_for(question)
+
+    def _show_details_for(self, question):
+        """Fill the panel for one entry, whichever view chose it."""
         self.selected = question
         for child in self.panel.winfo_children():
             child.destroy()
