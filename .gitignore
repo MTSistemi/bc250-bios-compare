@@ -1,0 +1,23 @@
+# Dumps and variables are the STATE OF REAL BOARDS: boot entries, disk serial
+# numbers, the memory configuration of that particular board. They are not
+# published, not even to make life easier for someone trying the tool out.
+material/
+*.rom
+*.ROM
+*.bin
+
+# Screenshots are taken off a real desktop, so they can catch whatever else was
+# on screen. They go in only after being retaken on a clean screen.
+screenshots/
+
+# Notes written for ourselves, in Italian. What goes on GitHub is README.md.
+LEGGIMI.md
+
+# Build output and the build's own virtual environment
+.venv/
+dist/
+build/
+*.spec
+
+__pycache__/
+*.pyc
