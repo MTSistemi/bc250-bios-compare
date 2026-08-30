@@ -580,5 +580,12 @@ def fingerprint(formset):
                 ifr.split_expression(node.children)[0]))
                 for name, node in question.conditions],
             "where": " > ".join(question.path),
+            # Where a link leads is part of what an entry IS: two Refs with the
+            # same name and the same offset can go to different places, and a
+            # modified firmware can redirect one into another form set without
+            # touching a single visible character.
+            "target": ((question.node.fields.get("form"),
+                        question.node.fields.get("formset_guid"))
+                       if question.kind == "Ref" else None),
         }
     return inside

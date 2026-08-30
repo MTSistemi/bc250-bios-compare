@@ -287,6 +287,13 @@ def _read_fields(node):
             node.fields["form"] = struct.unpack_from("<H", body, 11)[0]
         if len(body) >= 15:
             node.fields["question"] = struct.unpack_from("<H", body, 13)[0]
+        # WARNING: a Ref of 33 bytes (EFI_IFR_REF3) carries the GUID of ANOTHER
+        # form set, and that is how a menu links into a different one. Reading
+        # only the form number makes such a link look like an ordinary jump
+        # inside the same form set - which is exactly how the CHIPSETMENU mod
+        # opens the door to AMD CBS, and exactly what we missed at first.
+        if len(body) >= 31:
+            node.fields["formset_guid"] = guid_string(body[15:31])
 
     elif code == 0x09:                                    # OneOfOption
         if len(body) >= 4:
