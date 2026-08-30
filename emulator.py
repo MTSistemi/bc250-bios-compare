@@ -392,7 +392,14 @@ def command_export(args):
 # ==================================================================== startup
 
 def main(argv=None):
+    # argparse names the program after the file it was started from, which from
+    # the Debian package means every usage line reads "emulator.py" - a file the
+    # package does not install and the user has no way to run.
+    program = "bc250-bios-compare-cli" \
+        if os.path.dirname(os.path.abspath(__file__)).startswith("/usr/share/") \
+        else None                       # from a checkout, the file name is right
     parser = argparse.ArgumentParser(
+        prog=program,
         description="BC-250 BIOS Compare: reads the menus of a firmware image "
                     "and evaluates their conditions.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
