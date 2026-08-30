@@ -1,0 +1,67 @@
+.TH BC250\-BIOS\-COMPARE 1 "2026-08-30" "bc250-bios-compare 1.0.0" "User Commands"
+.SH NAME
+bc250\-bios\-compare \- read and compare the menus of AMD BC\-250 BIOS images
+.SH SYNOPSIS
+.B bc250\-bios\-compare
+.RI [ IMAGE.rom ]
+.RB [ \-\-bios ]
+.br
+.B bc250\-bios\-compare
+.B \-\-help
+.SH DESCRIPTION
+Opens the window: the tree of menus on the left, the selected entry and the
+effect of a change on the right.
+.PP
+It shows
+.B all
+the entries of a BIOS image, including the ones the firmware hides \- 651 of
+them in a stock BC\-250 image \- which a running board cannot show by
+definition. The firmware's own conditions are then evaluated against a state
+of the variables, so changing an entry shows what appears and what disappears.
+.PP
+It does not boot the firmware and it writes nothing to any hardware. Every
+image is opened read\-only.
+.SH OPTIONS
+.TP
+.I IMAGE.rom
+The image to open at start. Without it the program comes up empty and the
+image is chosen from the File menu.
+.TP
+.B \-\-bios
+Land straight on the BIOS view, the screen drawn with the glyphs and the
+palette taken out of the image, walked with the same keys as the board:
+arrows to move, Enter into a submenu, Esc back, plus and minus through the
+values, F9 for the defaults.
+.TP
+.B \-h ", " \-\-help
+Print this summary and exit.
+.SH LANGUAGES
+The interface starts in English and offers nine languages \- en, it, es, pt,
+fr, de, pl, uk, ru \- from the drop\-down at the top right. The choice is
+remembered in
+.IR ~/.config/bc250\-bios\-compare.json .
+.SH ENVIRONMENT
+.TP
+.B DISPLAY
+A window needs one. With no display the program says so and stops, rather
+than failing with a Tcl error; over ssh use
+.BR bc250\-bios\-compare\-cli (1)
+instead.
+.TP
+.B XDG_CONFIG_HOME
+Where the settings file goes, if set.
+.SH FILES
+.TP
+.I /usr/share/bc250\-bios\-compare/
+The program, its translations and the parameter cards.
+.TP
+.I ~/.config/bc250\-bios\-compare.json
+The chosen language.
+.SH SEE ALSO
+.BR bc250\-bios\-compare\-cli (1)
+.PP
+The full description is at
+.UR https://github.com/MTSistemi/bc250\-bios\-compare
+.UE .
+.SH AUTHOR
+MTSistemi.

@@ -1,0 +1,98 @@
+.TH BC250\-BIOS\-COMPARE\-CLI 1 "2026-08-30" "bc250-bios-compare 1.0.0" "User Commands"
+.SH NAME
+bc250\-bios\-compare\-cli \- read BC\-250 BIOS menus from the command line
+.SH SYNOPSIS
+.B bc250\-bios\-compare\-cli volumes
+.I IMAGE
+.br
+.B bc250\-bios\-compare\-cli formsets
+.I IMAGE
+.br
+.B bc250\-bios\-compare\-cli tree
+.I IMAGE
+.RB [ \-\-formset
+.IR N ]
+.RB [ \-\-all ]
+.RB [ \-\-variable
+.IR FILE ]
+.br
+.B bc250\-bios\-compare\-cli entry
+.I IMAGE TEXT
+.RB [ \-\-variable
+.IR FILE ]
+.br
+.B bc250\-bios\-compare\-cli simulate
+.I IMAGE
+.IR ENTRY = VALUE ...
+.br
+.B bc250\-bios\-compare\-cli compare
+.I IMAGE\-A IMAGE\-B
+.br
+.B bc250\-bios\-compare\-cli export
+.I IMAGE FILE.json
+.SH DESCRIPTION
+The same engine as the window, without the window: it needs no display and is
+what to use over ssh.
+.SH COMMANDS
+.TP
+.B volumes
+The UEFI volumes found in the image, by the \fB_FVH\fR signature, with the
+header checksum validated.
+.TP
+.B formsets
+The form sets: how many entries each holds, how many of those carry a
+condition that can hide them, and which variable they are stored in.
+.TP
+.B tree
+The menus, following the \fBRef\fR entries \- which is where the hierarchy
+really is, since inside a form set all forms are siblings. Forms no link
+leads to are listed apart.
+.TP
+.B entry
+Everything about one entry: where its value is stored (variable, GUID,
+offset), the options, the defaults, and the conditions with their outcome.
+.TP
+.B simulate
+What changes when entries are set to a value: which other entries appear and
+which disappear.
+.TP
+.B compare
+The differences between the menus of two images \- the menus, not the bytes.
+This is how a modified BIOS is told from the stock one.
+.TP
+.B export
+Everything, as JSON.
+.SH OPTIONS
+.TP
+.BI \-\-formset " N"
+Which form set to work on; without it, the one with the entries.
+.TP
+.B \-\-all
+Include the entries the firmware hides, marked rather than left out.
+.TP
+.BI \-\-variable " FILE"
+Read the values from a variable dumped off a running board instead of the
+firmware defaults, so the menu comes out as it is right now on that board.
+.SH READING THE VARIABLE OFF A BOARD
+.B AmdSetup
+is visible from Linux on a running board, but
+.B scp will not copy it
+\- efivarfs does not allow that. It has to go through base64:
+.PP
+.RS
+ssh root@board "base64 \-w0 /sys/firmware/efi/efivars/AmdSetup\-3a997502\-647a\-4c82\-998e\-52ef9486a247" | base64 \-d > AmdSetup.bin
+.RE
+.PP
+The first four bytes of that file are the attributes and not part of the
+variable; they are dropped after the length is checked.
+.SH EXIT STATUS
+.TP
+.B 0
+Done.
+.TP
+.B 1
+The image could not be read, or the request made no sense for it.
+.SH SEE ALSO
+.BR bc250\-bios\-compare (1)
+.SH AUTHOR
+MTSistemi.

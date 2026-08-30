@@ -34,7 +34,25 @@ sudo apt install python3-tk
 That is the whole of it. Everything else the program needs is in the standard
 library, so the sources run as they are on both systems.
 
-### Installing it, if you would rather not run it from the sources
+### The Debian package
+
+    python3 package.py             # writes dist/bc250-bios-compare_1.0.0-1_all.deb
+    sudo apt install ./dist/bc250-bios-compare_1.0.0-1_all.deb
+
+**This is the sensible way to install it on Debian and its derivatives.** The
+program is pure Python, so the package is `Architecture: all`: one file, every
+Debian, every architecture, **152 KiB** instead of 14 MB, and `python3-tk`
+comes in as a dependency rather than as a line in a README nobody reads.
+
+It installs two commands - `bc250-bios-compare` for the window and
+`bc250-bios-compare-cli` for the command line - with a man page each, a menu
+entry and an icon. `apt purge bc250-bios-compare` takes all of it away,
+`__pycache__` included.
+
+Building the package needs `dpkg-deb`, so it is done on a Debian machine.
+Nothing else: no debhelper, no build dependencies, and no root.
+
+### Or the one-file build, for a system without a package manager to please
 
     python3 build.py               # builds dist/bc250-bios-compare
     python3 build.py --install     # and puts it in ~/.local, with a menu entry
@@ -220,6 +238,7 @@ up (2233 = 4 + 0x8B5).
 | `languages.py` | the nine languages; the strings live in `languages/<code>.json` |
 | `tse.py` | reads the tab bar out of AMITSE, where the setup engine really keeps it |
 | `build.py`, `icon.py` | build the executable - `Bc250BiosCompare.exe` on Windows, `bc250-bios-compare` plus its `.desktop` entry on Linux |
+| `package.py`, `man/` | build the Debian package, man pages included |
 
 A forge - putting a modified image back together - is still missing. It is step
 four, and it comes last, after writing the variable has been proven on real

@@ -1195,6 +1195,15 @@ class CompareWindow(tk.Toplevel):
 # The name to type is not the same on the two systems, and printing the Windows
 # one on a Linux shell sends people looking for a file that is not there.
 COMMAND = "Bc250BiosCompare.exe" if os.name == "nt" else "bc250-bios-compare"
+# Same for the command line: from a checkout it is a script, from the Debian
+# package it is a command, and telling a packaged user to run `python3
+# emulator.py` sends them looking for a file that the package does not install.
+if os.path.dirname(os.path.abspath(__file__)).startswith("/usr/share/"):
+    COMMAND_CLI = "bc250-bios-compare-cli"          # installed from the package
+elif os.name == "nt":
+    COMMAND_CLI = "python emulator.py"
+else:
+    COMMAND_CLI = "python3 emulator.py"
 
 HELP = """BC-250 BIOS Compare - the window.
 
@@ -1205,8 +1214,8 @@ Pass a BIOS image to open it straight away, or start with no arguments and use
 with the firmware's own font.
 
 For the command line version - tree, entry, simulate, compare, export - run:
-python emulator.py --help
-""" % COMMAND
+%s --help
+""" % (COMMAND, COMMAND_CLI)
 
 
 def main():
@@ -1238,7 +1247,7 @@ def main():
         sys.stderr.write(
             "%s: no display to open a window on (%s).\n"
             "Over ssh, or with no graphical session, use the command line:\n"
-            "    python3 emulator.py --help\n" % (APP_NAME, error))
+            "    %s --help\n" % (APP_NAME, error, COMMAND_CLI))
         return 2
     if arguments:
         application.after(120, lambda: application.open_image(arguments[0]))
