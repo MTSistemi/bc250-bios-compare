@@ -104,6 +104,7 @@
  "what changes": "co się zmienia",
  "where": "gdzie",
  "written {file}": "zapisano {file}",
+ "{count} with no name": "{count} bez nazwy",
  "{righe} rows shown": "pokazano {righe} wierszy",
  "{shown} entries shown, {hidden} hidden by the firmware": "pokazano {shown} pozycji, {hidden} ukrytych przez firmware",
  "{shown} entries, {hidden} of them hidden by the firmware": "{shown} pozycji, w tym {hidden} ukrytych przez firmware",

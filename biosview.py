@@ -202,12 +202,26 @@ class BiosView(tk.Frame):
         self._write(row, column, " " * count, attribute)
 
     def _entry_rows(self, form):
+        """The rows to draw, and how many were left out and why.
+
+        WARNING: entries with no name at all are skipped. They exist - the
+        Save & Exit form of the stock BIOS has thirty-eight of them, mostly
+        numerics whose prompt points at an empty string - and the firmware does
+        not draw them either. Drawing them fills the screen with anonymous
+        "[0]" rows that hide the eight entries that mean something. They are
+        counted at the bottom instead, so nothing disappears quietly.
+        """
         rows = []
+        unnamed = 0
         for question in form.questions:
+            if not question.text_label.strip():
+                unnamed += 1
+                continue
             result = engine.verdict(question, self.state)
             if result.hidden and not self.show_hidden:
                 continue
             rows.append((question, result))
+        self._unnamed = unnamed
         return rows
 
     def draw(self):
@@ -379,11 +393,16 @@ class BiosView(tk.Frame):
     def _counts(self, entries):
         hidden = sum(1 for _q, result in entries if result.hidden)
         total = len(self.current_form.questions)
+        unnamed = getattr(self, "_unnamed", 0)
         if self.show_hidden:
-            return T("{shown} entries, {hidden} of them hidden by the firmware",
+            line = T("{shown} entries, {hidden} of them hidden by the firmware",
                      shown=total, hidden=hidden)
-        return T("{shown} entries shown, {hidden} hidden by the firmware",
-                 shown=len(entries), hidden=total - len(entries))
+        else:
+            line = T("{shown} entries shown, {hidden} hidden by the firmware",
+                     shown=len(entries), hidden=total - len(entries) - unnamed)
+        if unnamed:
+            line += ", " + T("{count} with no name", count=unnamed)
+        return line
 
     def _help_panel(self, top, bottom, entries):
         width = COLUMNS - HELP_AT - 2
@@ -791,7 +810,15 @@ class BiosView(tk.Frame):
         wanted = question.node.fields.get("form")
         target = self.formset.forms_by_id.get(wanted)
         if target is not None:
-            self.stack.append(target)
+            # WARNING: a form can be reached again from inside itself - six of
+            # the unnamed Refs of Save & Exit point at the form that holds
+            # them. Pushing it again grew the stack and the path at the bottom
+            # read "Save & Exit > Save & Exit > Save & Exit". Going back to it
+            # is the honest move.
+            if target in self.stack:
+                self.stack = self.stack[:self.stack.index(target) + 1]
+            else:
+                self.stack.append(target)
             self.row_index = 0
             self.draw()
             return "break"

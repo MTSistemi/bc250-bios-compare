@@ -104,6 +104,7 @@
  "what changes": "що змінюється",
  "where": "де",
  "written {file}": "записано {file}",
+ "{count} with no name": "{count} без назви",
  "{righe} rows shown": "показано {righe} рядків",
  "{shown} entries shown, {hidden} hidden by the firmware": "показано {shown} пунктів, {hidden} прихованих прошивкою",
  "{shown} entries, {hidden} of them hidden by the firmware": "{shown} пунктів, з них {hidden} прихованих прошивкою",
