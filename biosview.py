@@ -42,6 +42,7 @@ import tkinter as tk
 
 import engine
 import hiifont
+import tse
 from languages import T
 
 # --- the sixteen EFI console colours ---------------------------------------
@@ -100,6 +101,8 @@ class BiosView(tk.Frame):
         self.rows = []
         self.show_hidden = False
         self.image_name = ""
+        self.image = None               # the raw firmware, for font and tabs
+        self.tabs_from_tse = False      # whether the tab bar is the real one
         # The board keeps date and time in the RTC, not in a variable: those
         # two entries have no varstore at all (offset 0xFFFF). To behave like
         # the setup we keep a clock of our own, started from this machine.
@@ -128,9 +131,11 @@ class BiosView(tk.Frame):
     # ------------------------------------------------------------- contents
 
     def load(self, formset, state, image=None, formsets=None, image_name=""):
-        """Show a form set. `image` is the raw firmware, for its font."""
-        if image is not None and self.font is None:
-            self.font = hiifont.load(image)
+        """Show a form set. `image` is the raw firmware: its font and its tabs."""
+        if image is not None:
+            self.image = image
+            if self.font is None:
+                self.font = hiifont.load(image)
         self.formsets = list(formsets or [formset])
         self.formset = formset
         self.state = state
@@ -158,6 +163,20 @@ class BiosView(tk.Frame):
             self.tabs = []
             return
         main = formset.main_form
+        # The tabs the setup engine really shows are listed in AMITSE, not in
+        # the IFR. When that list can be read, it wins: on this board it is the
+        # difference between showing Security and showing Chipset, and it is
+        # the whole of what the CHIPSETMENU mod changes.
+        if self.image is not None:
+            numbers = tse.tab_form_ids(self.image, formset.guid)
+            real = [formset.forms_by_id[number] for number in numbers
+                    if number in formset.forms_by_id
+                    and formset.forms_by_id[number] is not main]
+            if real:
+                self.tabs = real
+                self.tabs_from_tse = True
+                return
+        self.tabs_from_tse = False
         only_links = bool(main and main.questions) and all(
             question.kind == "Ref" for question in main.questions)
         if main and main.children and only_links:
