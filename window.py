@@ -1192,13 +1192,16 @@ class CompareWindow(tk.Toplevel):
             agg=len(added), tolte=len(removed), cam=len(changed)))
 
 
-AIUTO = """BC-250 BIOS Compare - the window.
+HELP = """BC-250 BIOS Compare - the window.
 
-    Bc250BiosCompare.exe [IMAGE.rom]
+    Bc250BiosCompare.exe [IMAGE.rom] [--bios]
 
 Pass a BIOS image to open it straight away, or start with no arguments and use
-"Open image...". For the command line version - tree, entry, simulate, compare,
-export - run: python emulator.py --help
+"Open image...". Add --bios to land directly on the BIOS view, the one drawn
+with the firmware's own font.
+
+For the command line version - tree, entry, simulate, compare, export - run:
+python emulator.py --help
 """
 
 
@@ -1210,15 +1213,18 @@ def main():
                  if not argument.startswith("-")]
     options = [argument for argument in sys.argv[1:] if argument.startswith("-")]
     if any(option in ("-h", "--help", "/?") for option in options):
-        print(AIUTO)
+        print(HELP)
         # Started from a shortcut there is no console to read: show it anyway.
         root = tk.Tk()
         root.withdraw()
-        messagebox.showinfo(APP_NAME, AIUTO)
+        messagebox.showinfo(APP_NAME, HELP)
         return
     application = Application()
     if arguments:
         application.after(120, lambda: application.open_image(arguments[0]))
+        if "--bios" in options:
+            # After the image, so the view has something to draw.
+            application.after(400, lambda: application.views.select(1))
     application.mainloop()
 
 
