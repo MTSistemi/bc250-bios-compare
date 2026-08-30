@@ -93,6 +93,7 @@ class Application(tk.Tk):
 
         # --- the program state ---------------------------------------------
         self.path = None
+        self.image = None            # the raw firmware, for the BIOS font
         self.formsets = []
         self.formset = None
         self.state = None                # the values we are looking through
@@ -380,7 +381,8 @@ class Application(tk.Tk):
         self._say(T("opening {file}...", file=os.path.basename(path)))
         self.update_idletasks()
         try:
-            formsets = hii.open_image(volumes.read_image(path))
+            image = volumes.read_image(path)
+            formsets = hii.open_image(image)
         except Exception as error:                         # noqa: BLE001
             messagebox.showerror(APP_NAME, T(
                 "Cannot read {file}.\n\n{errore}\n\nA whole 16 MiB flash image "
@@ -398,6 +400,7 @@ class Application(tk.Tk):
             return
 
         self.path = path
+        self.image = image
         self.formsets = formsets
         self.variable_path = None
         self.source.set("defaults")
@@ -578,23 +581,11 @@ class Application(tk.Tk):
             return
         view.set_show_hidden(bool(self.show_hidden.get()))
         if view.formset is not self.formset:
-            view.load(self.formset, self.state, self._firmware_version(),
-                      formsets=self.formsets)
+            view.load(self.formset, self.state, image=self.image,
+                      formsets=self.formsets,
+                      image_name=os.path.basename(self.path or ""))
         else:
             view.set_state(self.state)
-
-    def _firmware_version(self):
-        """The version string the image carries, for the bottom of the screen.
-
-        It is read from the menu itself - the BIOS shows it on its Main page -
-        so it is true for the image being looked at, not a guess.
-        """
-        for formset in self.formsets:
-            for question in formset.questions:
-                label = question.text_label.strip().lower()
-                if label in ("bios version", "project version", "bios revision"):
-                    return question.help_text.strip() or label
-        return ""
 
     def _bios_selected(self, question):
         """The BIOS view moved: the details panel follows it."""
@@ -614,8 +605,9 @@ class Application(tk.Tk):
         self.formset = formset
         self._prepare_state()
         self.fill_tree()
-        self.bios.load(formset, self.state, self._firmware_version(),
-                       formsets=self.formsets)
+        self.bios.load(formset, self.state, image=self.image,
+                       formsets=self.formsets,
+                       image_name=os.path.basename(self.path or ""))
         self.bios.go_to(formset, form, self.state)
         self._update_footer()
 

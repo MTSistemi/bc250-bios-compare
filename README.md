@@ -70,10 +70,28 @@ card is written once and corrected in one place.
 
 ### Walking the menu the way the board shows it
 
+![The BIOS view: the Advanced tab of the stock firmware, with the hidden
+entries revealed in red](screenshots/bios-view.png)
+
 The **BIOS view** tab draws the same menu the board would: tab bar across the
 top, entries with their value in brackets, help panel on the right, key legend
 at the bottom. It is driven by the same keys - arrows to move, Enter to walk
 into a submenu, Esc to come back, `+`/`-` to change a value, F9 for defaults.
+
+Nothing on that screen is an approximation:
+
+- **the font is the one inside the image** - the BIOS carries its glyphs as an
+  HII Simple Font package, 8 by 19 pixels each, and `hiifont.py` pulls them
+  out; the stock BC-250 image has 242 of them, frame pieces and arrows
+  included;
+- **the colours are the sixteen EFI console colours**, the palette the firmware
+  itself is limited to - EFI blue is `#0000A8`, not "a blue that looks about
+  right";
+- **the grid is 100 by 31 characters**, the text mode the setup runs in.
+
+The picture above was not screen-captured: `BiosView.export_png()` builds it
+from the same glyphs and the same palette the window draws with, so it is exact
+and repeatable.
 
 Two things happen here that cannot happen on a real board:
 

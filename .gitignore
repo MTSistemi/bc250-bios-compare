@@ -6,9 +6,9 @@ material/
 *.ROM
 *.bin
 
-# Screenshots are taken off a real desktop, so they can catch whatever else was
-# on screen. They go in only after being retaken on a clean screen.
-screenshots/
+# Screenshots: only the ones the program GENERATES from its own pixels
+# (BiosView.export_png) belong here. Anything captured off a real desktop can
+# catch whatever else was on screen, and must not be committed.
 
 # Notes written for ourselves, in Italian. What goes on GitHub is README.md.
 LEGGIMI.md
