@@ -142,17 +142,29 @@ class BiosView(tk.Frame):
         self.draw()
 
     def _set_tabs(self, formset):
-        main = formset.main_form if formset else None
-        # The tab bar is what the main form links to; when it links nowhere -
-        # AMD CBS, which is reached from another form set - the roots are the
-        # tabs, main first.
-        if main and main.children:
+        """Which forms become the bar across the top.
+
+        A main form that holds nothing but links IS the tab bar - that is what
+        Setup is, six Refs to Main, Advanced, Chipset and the rest. A main form
+        that also holds real entries is a page in its own right, and its
+        children are submenus reached with Enter, not tabs.
+
+        WARNING: taking the children as tabs in both cases threw the main page
+        away. On the menu MeiMeiDXEv3 adds, that meant landing on the eight core
+        checkboxes and never seeing ACPI Patch, SMU Unlock and Core Unlock,
+        which are the reason the mod exists.
+        """
+        if not formset:
+            self.tabs = []
+            return
+        main = formset.main_form
+        only_links = bool(main and main.questions) and all(
+            question.kind == "Ref" for question in main.questions)
+        if main and main.children and only_links:
             self.tabs = list(main.children)
-        elif formset:
+        else:
             self.tabs = ([main] if main else []) + [
                 form for form in formset.roots if form is not main]
-        else:
-            self.tabs = []
 
     def set_state(self, state):
         self.state = state
