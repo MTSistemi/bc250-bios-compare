@@ -15,4 +15,4 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import window
 
 if __name__ == "__main__":
-    window.main()
+    sys.exit(window.main() or 0)

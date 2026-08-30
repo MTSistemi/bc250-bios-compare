@@ -1192,9 +1192,13 @@ class CompareWindow(tk.Toplevel):
             agg=len(added), tolte=len(removed), cam=len(changed)))
 
 
+# The name to type is not the same on the two systems, and printing the Windows
+# one on a Linux shell sends people looking for a file that is not there.
+COMMAND = "Bc250BiosCompare.exe" if os.name == "nt" else "bc250-bios-compare"
+
 HELP = """BC-250 BIOS Compare - the window.
 
-    Bc250BiosCompare.exe [IMAGE.rom] [--bios]
+    %s [IMAGE.rom] [--bios]
 
 Pass a BIOS image to open it straight away, or start with no arguments and use
 "Open image...". Add --bios to land directly on the BIOS view, the one drawn
@@ -1202,7 +1206,7 @@ with the firmware's own font.
 
 For the command line version - tree, entry, simulate, compare, export - run:
 python emulator.py --help
-"""
+""" % COMMAND
 
 
 def main():
@@ -1214,19 +1218,36 @@ def main():
     options = [argument for argument in sys.argv[1:] if argument.startswith("-")]
     if any(option in ("-h", "--help", "/?") for option in options):
         print(HELP)
-        # Started from a shortcut there is no console to read: show it anyway.
-        root = tk.Tk()
+        # Started from a shortcut there is no console to read: show it anyway -
+        # but only if there is a screen to show it on. Asked for the help over
+        # ssh with no display, opening a window is not a thing that can be done,
+        # and trying answered with a TclError traceback on top of the help that
+        # had just been printed correctly.
+        try:
+            root = tk.Tk()
+        except tk.TclError:
+            return
         root.withdraw()
         messagebox.showinfo(APP_NAME, HELP)
         return
-    application = Application()
+    try:
+        application = Application()
+    except tk.TclError as error:
+        # The commonest case by far is a Linux shell with no DISPLAY. Saying
+        # which program to use instead is worth more than the Tcl message.
+        sys.stderr.write(
+            "%s: no display to open a window on (%s).\n"
+            "Over ssh, or with no graphical session, use the command line:\n"
+            "    python3 emulator.py --help\n" % (APP_NAME, error))
+        return 2
     if arguments:
         application.after(120, lambda: application.open_image(arguments[0]))
         if "--bios" in options:
             # After the image, so the view has something to draw.
             application.after(400, lambda: application.views.select(1))
     application.mainloop()
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main() or 0)

@@ -165,8 +165,25 @@ def write(path="emulator.ico"):
     return path
 
 
+def write_png(path="emulator.png", side=256):
+    """The same mark as a single PNG, which is what Linux desktops want.
+
+    An .ico means nothing to a freedesktop menu: the .desktop file points at a
+    PNG under hicolor/<size>x<size>/apps. One 256 px file covers every use, the
+    desktop scales it down itself.
+    """
+    with open(path, "wb") as png_file:
+        png_file.write(_png_entry(draw(side)))
+    return path
+
+
 if __name__ == "__main__":
     import os
-    written = write(os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                 "emulator.ico"))
+    import sys
+
+    here = os.path.dirname(os.path.abspath(__file__))
+    if "--png" in sys.argv:
+        written = write_png(os.path.join(here, "emulator.png"))
+    else:
+        written = write(os.path.join(here, "emulator.ico"))
     print("wrote %s (%d bytes)" % (written, os.path.getsize(written)))

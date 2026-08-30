@@ -128,19 +128,40 @@ def missing(code):
 # be writable, and the language would be forgotten at every close without an
 # error to explain it. If even this cannot be written, never mind: we start in
 # English.
-SETTINGS = os.path.join(os.path.expanduser("~"), ".bc250-bios-compare.json")
+# Where that file goes is where each system expects it: a dotfile in the home on
+# Windows, $XDG_CONFIG_HOME (in practice ~/.config) on Linux. A program that
+# drops its own dotfile in a Linux home is a program written on Windows.
+
+
+def _settings_path():
+    if os.name == "nt":
+        return os.path.join(os.path.expanduser("~"), ".bc250-bios-compare.json")
+    base = os.environ.get("XDG_CONFIG_HOME") or \
+        os.path.join(os.path.expanduser("~"), ".config")
+    return os.path.join(base, "bc250-bios-compare.json")
+
+
+SETTINGS = _settings_path()
+# Anyone who used the Windows layout on Linux keeps their choice: it is read
+# from the old place when the new one is not there yet.
+LEGACY_SETTINGS = os.path.join(os.path.expanduser("~"), ".bc250-bios-compare.json")
 
 
 def read_choice():
-    try:
-        with io.open(SETTINGS, encoding="utf-8") as settings_file:
-            return json.load(settings_file).get("language", DEFAULT)
-    except Exception:                                      # noqa: BLE001
-        return DEFAULT
+    for path in (SETTINGS, LEGACY_SETTINGS):
+        try:
+            with io.open(path, encoding="utf-8") as settings_file:
+                return json.load(settings_file).get("language", DEFAULT)
+        except Exception:                                  # noqa: BLE001
+            continue
+    return DEFAULT
 
 
 def write_choice(code):
     try:
+        directory = os.path.dirname(SETTINGS)
+        if directory and not os.path.isdir(directory):
+            os.makedirs(directory, exist_ok=True)
         with io.open(SETTINGS, "w", encoding="utf-8") as settings_file:
             settings_file.write(json.dumps({"language": code}, ensure_ascii=False))
     except Exception:                                      # noqa: BLE001

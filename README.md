@@ -23,7 +23,41 @@ booting, because it also shows what the firmware would hide.
 
     python Bc250BiosCompare.pyw            # or: python window.py dump.rom
 
-On Windows a double click is enough. On Debian you need `python3-tk`.
+On Windows a double click is enough. On Debian and its derivatives - SkillFishOS
+included - the one thing to install is tkinter, which is not in the standard
+Debian Python:
+
+```bash
+sudo apt install python3-tk
+```
+
+That is the whole of it. Everything else the program needs is in the standard
+library, so the sources run as they are on both systems.
+
+### Installing it, if you would rather not run it from the sources
+
+    python3 build.py               # builds dist/bc250-bios-compare
+    python3 build.py --install     # and puts it in ~/.local, with a menu entry
+
+`--install` copies three files - the binary into `~/.local/bin`, the icon into
+`~/.local/share/icons`, the `.desktop` entry into `~/.local/share/applications`.
+No root, nothing of the system touched, and `--uninstall` removes exactly those
+three. On Windows the same script builds `Bc250BiosCompare.exe`, and with
+`--setup` the installer as well.
+
+![The BIOS view running on SkillFishOS, on a BC-250 - the same glyphs, the same
+palette, and the Chipset tab of a modified image](screenshots/bios-view-linux.png)
+
+That picture was drawn by the program running on a BC-250 board itself, under
+SkillFishOS with Python 3.14: same glyphs out of the image, same EFI palette,
+same tab bar read out of AMITSE. Nothing in the drawing is platform-dependent,
+which is the point of drawing it ourselves.
+
+**A one-file build is tied to the glibc of the machine that made it**: it runs
+on that version and on newer ones, never on older. Built on SkillFishOS
+(glibc 2.43) it will not start on Debian 12 or Ubuntu 22.04 - so a binary meant
+to be handed around wants building on the oldest system worth supporting. The
+sources have no such problem.
 
 The tree of menus is on the left, the selected entry and the effect of your
 changes on the right. It starts **in English**: this is a tool for a community
@@ -184,7 +218,8 @@ up (2233 = 4 + 0x8B5).
 | `emulator.py` | the command line |
 | `window.py` | the interface (tkinter), with `theme.py` |
 | `languages.py` | the nine languages; the strings live in `languages/<code>.json` |
-| `build.py`, `icon.py` | build `Bc250BiosCompare.exe` (and the installer, if Inno Setup is present) |
+| `tse.py` | reads the tab bar out of AMITSE, where the setup engine really keeps it |
+| `build.py`, `icon.py` | build the executable - `Bc250BiosCompare.exe` on Windows, `bc250-bios-compare` plus its `.desktop` entry on Linux |
 
 A forge - putting a modified image back together - is still missing. It is step
 four, and it comes last, after writing the variable has been proven on real
