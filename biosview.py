@@ -106,6 +106,7 @@ class BiosView(tk.Frame):
         self.clock = datetime.datetime.now().replace(microsecond=0)
         self.field = 0                  # which part of a date or time is being edited
         self.popup = None               # the option list or the number box
+        self.notice = ""                # one line about what just happened
         self._glyph_cache = {}
         self._cells = {}                # (row, column) -> (char, fg, bg)
 
@@ -269,7 +270,9 @@ class BiosView(tk.Frame):
         # --- the bottom lines ------------------------------------------
         where = " > ".join(form.title for form in self.stack)
         self._write(ROWS - 2, 1, where[:COLUMNS - 2], ATTR_KEYS)
-        self._write(ROWS - 1, 1, self._counts(entries)[:COLUMNS - 2], ATTR_KEYS)
+        bottom_line = self.notice or self._counts(entries)
+        self._write(ROWS - 1, 1, bottom_line[:COLUMNS - 2],
+                    ATTR_EDIT if self.notice else ATTR_KEYS)
 
         if self.popup is not None:
             self._draw_popup()
@@ -328,6 +331,15 @@ class BiosView(tk.Frame):
             return self.clock.strftime("%a %m/%d/%Y")
         if kind == "Time":
             return self.clock.strftime("%H:%M:%S")
+        if kind == "String":
+            return self._read_string(question)
+        if kind == "Password":
+            # The firmware keeps a hash, not the password. What can honestly be
+            # said is whether one has been set, which is what the setup shows.
+            raw = self.state.read_bytes(question)
+            if raw is None:
+                return None
+            return "Installed" if any(raw) else "Not Installed"
         raw = self.state.read(question)
         if raw is engine.UNKNOWN:
             return None
@@ -346,6 +358,15 @@ class BiosView(tk.Frame):
                 return "0x%X" % raw
             return str(raw)
         return "0x%X" % raw
+
+    def _read_string(self, question):
+        """A string entry, decoded from the UCS-2 the firmware stores."""
+        raw = self.state.read_bytes(question)
+        if raw is None:
+            return None
+        text = raw.decode("utf-16-le", "replace")
+        cut = text.find("\x00")
+        return text[:cut] if cut >= 0 else text
 
     def _field_span(self, question, shown):
         """Which slice of a date or time the cursor is on: (start, length)."""
@@ -462,6 +483,16 @@ class BiosView(tk.Frame):
             body = [option.text or ("0x%X" % option.value)
                     for option in question.options]
             chosen = popup["index"]
+        elif popup["kind"] == "password":
+            body = ["*" * len(popup["buffer"]) + "_", "",
+                    T("The firmware keeps a hash of the password, not the "
+                      "password itself: nothing is written here.")]
+            chosen = -1
+        elif popup["kind"] == "text":
+            longest = question.node.fields.get("maximum") or 0
+            body = [popup["buffer"] + "_", "",
+                    T("Up to {count} characters", count=longest) if longest else ""]
+            chosen = -1
         else:
             limits = ""
             minimum = question.node.fields.get("minimum")
@@ -510,6 +541,13 @@ class BiosView(tk.Frame):
         if kind == "Numeric":
             self.popup = {"kind": "number", "question": question, "buffer": ""}
             return
+        if kind == "String":
+            self.popup = {"kind": "text", "question": question,
+                          "buffer": self._read_string(question) or ""}
+            return
+        if kind == "Password":
+            self.popup = {"kind": "password", "question": question, "buffer": ""}
+            return
         # Date and time are edited in place, like the setup: Tab moves between
         # the parts, plus and minus or the digits change them.
 
@@ -531,6 +569,21 @@ class BiosView(tk.Frame):
                 except ValueError:
                     pass
                 self.popup = None
+        elif popup["kind"] in ("text", "password"):
+            longest = question.node.fields.get("maximum") or 32
+            if key == "BackSpace":
+                popup["buffer"] = popup["buffer"][:-1]
+            elif key == "Return":
+                if popup["kind"] == "text":
+                    self._apply_typed_text(question, popup["buffer"])
+                else:
+                    # Nothing is written: see the note in the box. Saying it
+                    # after the fact would be worse than not offering the box.
+                    self.notice = T("Password not written: the firmware stores "
+                                    "a hash we cannot compute.")
+                self.popup = None
+            elif event.char and event.char.isprintable():
+                popup["buffer"] = (popup["buffer"] + event.char)[:longest]
         else:
             if key == "BackSpace":
                 popup["buffer"] = popup["buffer"][:-1]
@@ -541,6 +594,16 @@ class BiosView(tk.Frame):
                 popup["buffer"] = (popup["buffer"] + event.char)[:10]
         self.draw()
         return "break"
+
+    def _apply_typed_text(self, question, text):
+        """Write a string entry back as the UCS-2 the firmware expects."""
+        longest = question.node.fields.get("maximum") or 0
+        if longest:
+            text = text[:longest]
+        try:
+            self.state.write_bytes(question, text.encode("utf-16-le"))
+        except ValueError:
+            pass
 
     def _apply_typed_number(self, question, text):
         if not text:
@@ -619,6 +682,7 @@ class BiosView(tk.Frame):
     def _key(self, event):
         if self.popup is not None:
             return self._popup_key(event)
+        self.notice = ""
         key = event.keysym
         question = self.selected_question()
         if key == "Up":

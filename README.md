@@ -102,6 +102,12 @@ two in the RTC and not in a variable, so this screen keeps a clock of its own.
 
 ![The option list, as the setup opens it](screenshots/bios-popup.png)
 
+Text entries are typed into the same way, and written back as the UCS-2 the
+firmware stores. Password entries open the box and mask what you type, but
+nothing is written: the firmware keeps a hash of the password, not the
+password, and we cannot compute it. The box says so before you type, not
+after.
+
 Two things happen here that cannot happen on a real board:
 
 - the hidden entries can be **revealed in place**, marked rather than missing,

@@ -157,6 +157,38 @@ class State(object):
             raise ValueError("entry %r falls outside the variable" % question.text_label)
         struct.pack_into(FORMATS[width], data, offset, value & ((1 << (8 * width)) - 1))
 
+    def read_bytes(self, question):
+        """The raw bytes of an entry, whatever its width.
+
+        String and password entries are not 1, 2, 4 or 8 bytes wide - they are
+        as wide as the text they hold - so read() cannot serve them and they
+        need the slice itself.
+        """
+        store = question.varstore
+        if store is None or store.identifier not in self.buffers:
+            return None
+        offset, width = question.offset, question.width
+        if offset is None or not width:
+            return None
+        data = self.buffers[store.identifier]
+        if offset + width > len(data):
+            return None
+        return bytes(data[offset:offset + width])
+
+    def write_bytes(self, question, payload):
+        """Write raw bytes into an entry, padding or truncating to its width."""
+        store = question.varstore
+        if store is None or store.identifier not in self.buffers:
+            raise ValueError("entry %r has no writable varstore" % question.text_label)
+        offset, width = question.offset, question.width
+        if offset is None or not width:
+            raise ValueError("entry %r has nowhere to be written" % question.text_label)
+        data = self.buffers[store.identifier]
+        if offset + width > len(data):
+            raise ValueError("entry %r falls outside the variable" % question.text_label)
+        payload = (payload + b"\x00" * width)[:width]
+        data[offset:offset + width] = payload
+
     def value_of_id(self, identifier):
         """The value of a question looked up by identifier (the IFR needs this)."""
         question = self._by_id.get(identifier)
