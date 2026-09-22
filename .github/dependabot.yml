@@ -1,0 +1,12 @@
+version: 2
+updates:
+  # The GitHub Actions the workflows use: the only third-party code this
+  # repository pulls in by version.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels: ["dependencies", "ci"]
+    commit-message:
+      prefix: "deps(ci)"

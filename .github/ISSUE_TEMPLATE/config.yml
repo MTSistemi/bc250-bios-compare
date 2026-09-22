@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security report
+    url: https://github.com/MTSistemi/bc250-bios-compare/security/advisories/new
+    about: A crafted image that crashes the parser or makes the comparison lie. Please do not open a public issue.

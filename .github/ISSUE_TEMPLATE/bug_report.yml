@@ -1,0 +1,36 @@
+name: Bug report
+description: Something is shown wrong, missing, or the tool crashes
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The release you downloaded, or the commit if you run from source
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: System
+      options: [Windows, Linux]
+    validations:
+      required: true
+  - type: textarea
+    id: images
+    attributes:
+      label: Which BIOS images
+      description: Where they come from (stock, a known modified one, a dump of your board). Attach them only if you are allowed to share them.
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what you expected
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Error or output
+      render: shell
