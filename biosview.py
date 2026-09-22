@@ -617,6 +617,7 @@ class BiosView(tk.Frame):
                     self.state.set_value(question,
                                          question.options[popup["index"]].value)
                 except ValueError:
+                    # the firmware refuses the value: the entry keeps the one it had
                     pass
                 self.popup = None
         elif popup["kind"] in ("text", "password"):
@@ -653,6 +654,7 @@ class BiosView(tk.Frame):
         try:
             self.state.write_bytes(question, text.encode("utf-16-le"))
         except ValueError:
+            # the firmware refuses the value: the entry keeps the one it had
             pass
 
     def _apply_typed_number(self, question, text):
@@ -671,6 +673,7 @@ class BiosView(tk.Frame):
         try:
             self.state.set_value(question, value)
         except ValueError:
+            # the firmware refuses the value: the entry keeps the one it had
             pass
 
     # -------------------------------------------------------------- export
@@ -914,6 +917,7 @@ class BiosView(tk.Frame):
         try:
             self.state.set_value(question, value)
         except ValueError:
+            # the firmware refuses the value: the entry keeps the one it had
             pass
 
     def _step_clock(self, question, direction):

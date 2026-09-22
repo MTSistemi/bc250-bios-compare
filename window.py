@@ -42,7 +42,7 @@ import languages
 import theme
 import volumes
 
-from languages import T
+T = languages.T
 
 # The program name is a proper noun: it is not translated, and it is the same
 # in the title bar, in the dialogs and in the repository.
@@ -1235,10 +1235,10 @@ def main():
         try:
             root = tk.Tk()
         except tk.TclError:
-            return
+            return 0
         root.withdraw()
         messagebox.showinfo(APP_NAME, HELP)
-        return
+        return 0
     try:
         application = Application()
     except tk.TclError as error:

@@ -30,9 +30,6 @@ from __future__ import unicode_literals
 
 import struct
 
-import ffs
-import volumes
-
 PACKAGE_SIMPLE_FONT = 0x07
 GLYPH_WIDTH = 8
 GLYPH_HEIGHT = 19

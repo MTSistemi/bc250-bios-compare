@@ -321,10 +321,10 @@ def all_sections(sections):
 
 def nested_volumes(sections):
     """The UEFI volumes held inside sections of type "volume"."""
-    import volumes
+    from volumes import find_volumes
     found = []
     for section in all_sections(sections):
         if section.kind == SECTION_VOLUME:
-            for volume in volumes.find_volumes(section.data):
+            for volume in find_volumes(section.data):
                 found.append(volume)
     return found
